@@ -61,7 +61,8 @@ module fv3gfs_cap_mod
                                     importFieldsList, importFieldTypes,      &
                                     importFieldShare, importFieldsValid,     &
                                     queryFieldList,   fillExportFields,      &
-                                    exportData
+                                    fillExportScalars, exportData
+!
   use module_cap_cpl,         only: realizeConnectedCplFields,               &
                                     clock_cplIntval, diagnose_cplFields      
 
@@ -94,6 +95,11 @@ module fv3gfs_cap_mod
   integer            :: timeslice = 0
   integer            :: fcstmype
   integer            :: dbug = 0
+
+  character(len=128) :: scalar_field_name = ''
+  integer            :: scalar_field_count = 0
+  integer            :: scalar_field_idx_grid_nx = 0
+  integer            :: scalar_field_idx_grid_ny = 0
 
 !-----------------------------------------------------------------------
 
@@ -188,7 +194,7 @@ module fv3gfs_cap_mod
     type(ESMF_Clock)      :: clock
     integer, intent(out)  :: rc
 
-    character(len=10)     :: value
+    character(len=128)    :: value
     character(240)        :: msgString
     logical               :: isPresent, isSet
     character(len=*),parameter  :: subname='(fv3gfs_cap:InitializeP0)'
@@ -230,6 +236,35 @@ module fv3gfs_cap_mod
      read(value,*) dbug
     end if
     write(msgString,'(A,i6)') trim(subname)//' dbug = ',dbug
+    call ESMF_LogWrite(trim(msgString), ESMF_LOGMSG_INFO, rc=rc)
+
+    ! Read attributes to write mediator history file in 2d for regional setup
+    call NUOPC_CompAttributeGet(gcomp, name='ScalarFieldName', value=value, isPresent=isPresent, isSet=isSet, rc=rc)
+    if (isPresent .and. isSet) then
+     scalar_field_name = trim(value)
+    end if
+    write(msgString,'(A)') trim(subname)//' scalar_field_name = '//trim(scalar_field_name)
+    call ESMF_LogWrite(trim(msgString), ESMF_LOGMSG_INFO, rc=rc)
+
+    call NUOPC_CompAttributeGet(gcomp, name='ScalarFieldCount', value=value, isPresent=isPresent, isSet=isSet, rc=rc)
+    if (isPresent .and. isSet) then
+     read(value,*) scalar_field_count
+    end if
+    write(msgString,'(A,i6)') trim(subname)//' scalar_field_count = ',scalar_field_count
+    call ESMF_LogWrite(trim(msgString), ESMF_LOGMSG_INFO, rc=rc)
+
+    call NUOPC_CompAttributeGet(gcomp, name='ScalarFieldIdxGridNX', value=value, isPresent=isPresent, isSet=isSet, rc=rc)
+    if (isPresent .and. isSet) then
+     read(value,*) scalar_field_idx_grid_nx
+    end if
+    write(msgString,'(A,i6)') trim(subname)//' scalar_field_idx_grid_nx = ',scalar_field_idx_grid_nx
+    call ESMF_LogWrite(trim(msgString), ESMF_LOGMSG_INFO, rc=rc)
+
+    call NUOPC_CompAttributeGet(gcomp, name='ScalarFieldIdxGridNY', value=value, isPresent=isPresent, isSet=isSet, rc=rc)
+    if (isPresent .and. isSet) then
+     read(value,*) scalar_field_idx_grid_ny
+    end if
+    write(msgString,'(A,i6)') trim(subname)//' scalar_field_idx_grid_ny = ',scalar_field_idx_grid_ny
     call ESMF_LogWrite(trim(msgString), ESMF_LOGMSG_INFO, rc=rc)
 
   end subroutine
@@ -932,8 +967,7 @@ module fv3gfs_cap_mod
     integer, intent(out) :: rc
 
     ! local variables
-    logical :: isPetLocal
-    integer :: n
+    logical                     :: isPetLocal
 
     rc = ESMF_SUCCESS
 
@@ -945,14 +979,12 @@ module fv3gfs_cap_mod
       if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__,  file=__FILE__)) return
 
       if (isPetLocal) then
-
         ! -- realize connected fields in exportState
         call realizeConnectedCplFields(exportState, fcstGrid,                                                &
                                        numLevels, numSoilLayers, numTracers, num_diag_sfc_emis_flux,         &
                                        num_diag_down_flux, num_diag_type_down_flux, num_diag_burn_emis_flux, &
                                        num_diag_cmass, exportFieldsList, exportFieldTypes, 'FV3 Export',     &
-                                       exportFields, 0.0_ESMF_KIND_R8, rc)
-
+                                       exportFields, 0.0_ESMF_KIND_R8, scalar_field_count, rc)
         if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__,  file=__FILE__)) return
 
         ! -- realize connected fields in importState
@@ -960,11 +992,11 @@ module fv3gfs_cap_mod
                                        numLevels, numSoilLayers, numTracers, num_diag_sfc_emis_flux,         &
                                        num_diag_down_flux, num_diag_type_down_flux, num_diag_burn_emis_flux, &
                                        num_diag_cmass, importFieldsList, importFieldTypes, 'FV3 Import',     &
-                                       importFields, 9.99e20_ESMF_KIND_R8, rc)
+                                       importFields, 9.99e20_ESMF_KIND_R8, scalar_field_count, rc)
         if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__,  file=__FILE__)) return
       end if
 !jw
-      call fillExportFields(exportData)
+      call fillExportFields(exportData, fcstGrid, scalar_field_idx_grid_nx, scalar_field_idx_grid_ny)
     endif
 
   end subroutine InitializeRealize

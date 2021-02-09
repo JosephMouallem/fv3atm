@@ -103,7 +103,7 @@ module module_cap_cpl
                                          num_diag_sfc_emis_flux, num_diag_down_flux,       &
                                          num_diag_type_down_flux, num_diag_burn_emis_flux, &
                                          num_diag_cmass, fieldNames, fieldTypes, state_tag,&
-                                         fieldList, fill_value, rc)
+                                         fieldList, fill_value, scalar_field_count, rc)
 
       type(ESMF_State),            intent(inout)  :: state
       type(ESMF_Grid),                intent(in)  :: grid
@@ -120,6 +120,7 @@ module module_cap_cpl
       character(len=*),               intent(in)  :: state_tag                              !< Import or export.
       type(ESMF_Field), dimension(:), intent(out) :: fieldList
       real(ESMF_KIND_R8), optional  , intent(in)  :: fill_value
+      integer, optional             , intent(in)  :: scalar_field_count
       integer,                        intent(out) :: rc
 
       ! local variables
@@ -128,6 +129,8 @@ module module_cap_cpl
       type(ESMF_Field)   :: field
       real(ESMF_KIND_R8) :: l_fill_value
       real(ESMF_KIND_R8), parameter :: d_fill_value = 0._ESMF_KIND_R8
+      type(ESMF_Grid)    :: grid_local
+      type(ESMF_Distgrid):: distgrid
 
       ! begin
       rc = ESMF_SUCCESS
@@ -194,6 +197,21 @@ module module_cap_cpl
                                        name=trim(fieldNames(item)),     &
                                        ungriddedLBound=(/1/), ungriddedUBound=(/numSoilLayers/), rc=rc)
               if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__)) return
+            case ('x','scalar')
+              if (scalar_field_count > 0) then
+                distgrid = ESMF_DistGridCreate(minIndex=(/1/), maxIndex=(/1/), rc=rc)
+                if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__)) return
+
+                grid_local = ESMF_GridCreate(distgrid, rc=rc)
+                if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__)) return
+
+                field = ESMF_FieldCreate(grid_local, typekind=ESMF_TYPEKIND_R8, &
+                                         name=trim(fieldNames(item)), &
+                                         ungriddedLBound=(/1/), &
+                                         ungriddedUBound=(/scalar_field_count/), &
+                                         gridToFieldMap=(/2/), rc=rc)
+                if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__)) return
+              end if
             case default
               call ESMF_LogSetError(ESMF_RC_NOT_VALID, &
                 msg="exportFieldType = '"//trim(fieldTypes(item))//"' not recognized", &

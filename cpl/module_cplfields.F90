@@ -13,7 +13,7 @@ module module_cplfields
   private
 
 ! Export Fields ----------------------------------------
-  integer,          public, parameter :: NexportFields = 71
+  integer,          public, parameter :: NexportFields = 72
   type(ESMF_Field), target, public    :: exportFields(NexportFields)
   character(len=*), public, parameter :: exportFieldsList(NexportFields) = (/ &
        "inst_pres_interface                      ", &
@@ -86,7 +86,8 @@ module module_cplfields
        "inst_merid_wind_height_lowest            ", &
        "inst_pres_height_lowest                  ", &
        "inst_height_lowest                       ", &
-       "mean_fprec_rate                          "  &
+       "mean_fprec_rate                          ", &
+       "cpl_scalars"                                &
 !      "northward_wind_neutral                   ", &
 !      "eastward_wind_neutral                    ", &
 !      "upward_wind_neutral                      ", &
@@ -103,6 +104,7 @@ module module_cplfields
   !  l : model levels (3D)
   !  s : surface (2D)
   !  t : tracers (4D)
+  !  c : scalars (1D)
   character(len=*), public, parameter :: exportFieldTypes(NexportFields) = (/ &
        "i","l","i","l","l","l","l","l","t", &
        "s","s","s","s","l","l","s","s","g", &
@@ -112,7 +114,7 @@ module module_cplfields
        "s","s","s","s","s","s","s","s",     &
        "s","s","s","s","s","s","s","s",     &
        "s","s","s","s","s","s","s","s",     &
-       "s","s","s","s","s"                  &
+       "s","s","s","s","s","x"              &
 !      "l","l","l","l","l","l","l","s",     &
   /)
   ! Set exportFieldShare to .true. if field is provided as memory reference
@@ -124,15 +126,15 @@ module module_cplfields
        .true. ,.true. ,.true. ,.true. ,.true. , &
        .true. ,.true. ,.true. ,.false.,.false., &
        .false.,.false.,.false.,.false.,.false., &
-       .false.,.false.,.false.,.false.,.false. , &
-       .true. ,.false.,.false.,.false.,.false. , &
+       .false.,.false.,.false.,.false.,.false., &
+       .true. ,.false.,.false.,.false.,.false., &
        .true. ,.false.,.false.,.false.,.false., &
        .false.,.false.,.false.,.false.,.false., &
        .false.,.false.,.false.,.false.,.false., &
        .false.,.false.,.false.,.false.,.false., &
        .false.,.false.,.false.,.true. ,.false., &
        .false.,.false.,.false.,.false.,.false., &
-       .false.                                  &
+       .false.,.false.                          &
 !      .false.,.false.,.false.,.false.,.false., &
 !      .false.,.false.,.false.                  &
   /)
@@ -192,14 +194,18 @@ module module_cplfields
   contains
 !-----------------------------------------------------------------------------
 
-  subroutine fillExportFields(data_a2oi, rc)
+  subroutine fillExportFields(data_a2oi, fcstGrid, scalar_field_idx_grid_nx, scalar_field_idx_grid_ny, rc)
     ! Fill updated data into the export Fields.
     real(kind=8), target, intent(in)            :: data_a2oi(:,:,:)
+    type(ESMF_Grid), intent(in), optional       :: fcstGrid 
+    integer, intent(in), optional               :: scalar_field_idx_grid_nx
+    integer, intent(in), optional               :: scalar_field_idx_grid_ny
     integer, intent(out), optional              :: rc
 
     integer                                     :: localrc
-    integer                                     :: n,dimCount
-    logical                                     :: isCreated
+    integer                                     :: n,dimCount,tileCount
+    integer, allocatable                        :: maxIndex(:)
+    logical                                     :: isCreated, fill_cpl_scalars
     type(ESMF_TypeKind_Flag)                    :: datatype
     character(len=ESMF_MAXSTR)                  :: fieldName
     real(kind=ESMF_KIND_R4), dimension(:,:), pointer   :: datar42d
@@ -207,6 +213,8 @@ module module_cplfields
     
 !
     if (present(rc)) rc=ESMF_SUCCESS
+    fill_cpl_scalars = .false.
+    if (present(fcstGrid) .and. present(scalar_field_idx_grid_nx) .and. present(scalar_field_idx_grid_ny)) fill_cpl_scalars = .true.
 
     do n=1, size(exportFields)
       isCreated = ESMF_FieldIsCreated(exportFields(n), rc=localrc)
@@ -218,9 +226,23 @@ module module_cplfields
         !print *,'in fillExportFields, field created n=',n,size(exportFields),'name=', trim(fieldname)
         if ( datatype == ESMF_TYPEKIND_R8) then
            if ( dimCount == 2) then
-             call ESMF_FieldGet(exportFields(n),farrayPtr=datar82d,localDE=0, rc=localrc)
-             if (ESMF_LogFoundError(rcToCheck=localrc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__, rcToReturn=rc)) return
-             datar82d = data_a2oi(:,:,n)
+              call ESMF_FieldGet(exportFields(n),farrayPtr=datar82d,localDE=0, rc=localrc)
+              if (ESMF_LogFoundError(rcToCheck=localrc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__, rcToReturn=rc)) return
+              if (trim(fieldname) == 'cpl_scalars' .and. fill_cpl_scalars) then
+                 call ESMF_GridGet(fcstGrid, tileCount=tileCount, dimCount=dimCount, rc=rc)
+                 if (ESMF_LogFoundError(rcToCheck=localrc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__, rcToReturn=rc)) return
+                 ! -- regional grid or not?
+                 if (tileCount .eq. 1) then 
+                   allocate(maxIndex(dimCount))
+                   call ESMF_GridGet(fcstGrid, 1, ESMF_STAGGERLOC_CENTER, maxIndex=maxIndex, rc=rc)
+                   if (ESMF_LogFoundError(rcToCheck=localrc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__, rcToReturn=rc)) return
+                   datar82d(scalar_field_idx_grid_nx,1) = maxIndex(1)
+                   datar82d(scalar_field_idx_grid_ny,1) = maxIndex(2)
+                   deallocate(maxIndex)
+                 end if
+              else
+                 datar82d = data_a2oi(:,:,n)
+              end if
            endif
         else if ( datatype == ESMF_TYPEKIND_R4) then
            if ( dimCount == 2) then
