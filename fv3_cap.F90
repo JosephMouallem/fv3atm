@@ -61,7 +61,7 @@ module fv3gfs_cap_mod
                                     importFieldsList, importFieldTypes,      &
                                     importFieldShare, importFieldsValid,     &
                                     queryFieldList,   fillExportFields,      &
-                                    fillExportScalars, exportData
+                                    exportData
 !
   use module_cap_cpl,         only: realizeConnectedCplFields,               &
                                     clock_cplIntval, diagnose_cplFields      
