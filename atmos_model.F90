@@ -1524,7 +1524,7 @@ end subroutine atmos_data_type_chksum
     integer, intent(out) :: rc
 
     !--- local variables
-    integer :: n, j, i, ix, nb, isc, iec, jsc, jec, dimCount, findex
+    integer :: n, j, i, ix, nb, isc, iec, jsc, jec, dimCount, tileCount, findex
     character(len=128) :: impfield_name, fldname
     type(ESMF_TypeKind_Flag)                           :: datatype
     real(kind=ESMF_KIND_R4),  dimension(:,:), pointer  :: datar42d
@@ -1875,17 +1875,25 @@ end subroutine atmos_data_type_chksum
             call ESMF_FieldGet(importFields(n), grid=grid, rc=rc)
             if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__)) return
 
-            dbgField = ESMF_FieldCreate(grid=grid, farrayPtr=datar8, name=impfield_name, rc=rc)
+            call ESMF_GridGet(grid, tileCount=tileCount, rc=rc)
             if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__)) return
 
-            write (currtimestring, "(I4.4,'-',I2.2,'-',I2.2,'T',I2.2,':',I2.2,':',I2.2)") &
-              jdat(1), jdat(2), jdat(3), jdat(5), jdat(6), jdat(7)
-            call ESMF_FieldWrite(dbgField, fileName='fv3_merge_'//trim(impfield_name)//'_'// &
-              trim(currtimestring)//'.nc', rc=rc)
-            if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__)) return
+            ! regional grid or not?
+            if (tileCount .eq. 1) then 
+              dbgField = ESMF_FieldCreate(grid=grid, farrayPtr=datar8, name=impfield_name, rc=rc)
+              if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__)) return
 
-            call ESMF_FieldDestroy(dbgField, rc=rc)
-            if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__)) return
+              write (currtimestring, "(I4.4,'-',I2.2,'-',I2.2,'T',I2.2,':',I2.2,':',I2.2)") &
+                jdat(1), jdat(2), jdat(3), jdat(5), jdat(6), jdat(7)
+              call ESMF_FieldWrite(dbgField, fileName='fv3_merge_'//trim(impfield_name)//'_'// &
+                trim(currtimestring)//'.nc', rc=rc)
+              if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__)) return
+
+              call ESMF_FieldDestroy(dbgField, rc=rc)
+              if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__)) return
+            else
+              if (mpp_pe() == mpp_root_pe() .and. debug)  print *,'debug_merge: only works for regional app with single tile! skip it.'
+            endif
           endif
 
         endif ! if (datar8(isc,jsc) > -99999.0) then
