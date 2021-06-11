@@ -1935,13 +1935,24 @@ module GFS_diagnostics
 
     idx = idx + 1
     ExtDiag(idx)%axes = 3
-    ExtDiag(idx)%name = 'dkudiagnostic'
-    ExtDiag(idx)%desc = 'Eddy Diffusivity'
+    ExtDiag(idx)%name = 'dkt'
+    ExtDiag(idx)%desc = 'Atmospheric heat diffusivity'
     ExtDiag(idx)%unit = 'm2s-1'
     ExtDiag(idx)%mod_name = 'gfs_phys'
     allocate (ExtDiag(idx)%data(nblks))
     do nb = 1,nblks
-      ExtDiag(idx)%data(nb)%var3 => IntDiag(nb)%dkudiagnostic(:,:)
+      ExtDiag(idx)%data(nb)%var3 => IntDiag(nb)%dkt(:,:)
+    enddo
+
+    idx = idx + 1
+    ExtDiag(idx)%axes = 3
+    ExtDiag(idx)%name = 'dku'
+    ExtDiag(idx)%desc = 'Atmospheric momentum diffusivity'
+    ExtDiag(idx)%unit = 'm2s-1'
+    ExtDiag(idx)%mod_name = 'gfs_phys'
+    allocate (ExtDiag(idx)%data(nblks))
+    do nb = 1,nblks
+      ExtDiag(idx)%data(nb)%var3 => IntDiag(nb)%dku(:,:)
     enddo
 
     idx = idx + 1
@@ -2042,6 +2053,28 @@ module GFS_diagnostics
     allocate (ExtDiag(idx)%data(nblks))
     do nb = 1,nblks
       ExtDiag(idx)%data(nb)%var3 => IntDiag(nb)%shum_wts(:,:)
+    enddo
+
+    idx = idx + 1
+    ExtDiag(idx)%axes = 2
+    ExtDiag(idx)%name = 'sfc_wts1'
+    ExtDiag(idx)%desc = 'perturbation amplitude'
+    ExtDiag(idx)%unit = 'none'
+    ExtDiag(idx)%mod_name = 'gfs_phys'
+    allocate (ExtDiag(idx)%data(nblks))
+    do nb = 1,nblks
+      ExtDiag(idx)%data(nb)%var2 => IntDiag(nb)%sfc_wts(:,1)
+    enddo
+
+    idx = idx + 1
+    ExtDiag(idx)%axes = 2
+    ExtDiag(idx)%name = 'sfc_wts2'
+    ExtDiag(idx)%desc = 'perturbation amplitude'
+    ExtDiag(idx)%unit = 'none'
+    ExtDiag(idx)%mod_name = 'gfs_phys'
+    allocate (ExtDiag(idx)%data(nblks))
+    do nb = 1,nblks
+      ExtDiag(idx)%data(nb)%var2 => IntDiag(nb)%sfc_wts(:,2)
     enddo
 
     idx = idx + 1
@@ -2760,7 +2793,6 @@ module GFS_diagnostics
         do nb = 1,nblks
            ExtDiag(idx)%data(nb)%var3 => IntDiag(nb)%dq3dt(:,:,9)
         enddo
-      end if if_qdiag3d
 
       idx = idx + 1
       ExtDiag(idx)%axes = 3
@@ -2809,6 +2841,44 @@ module GFS_diagnostics
       do nb = 1,nblks
         ExtDiag(idx)%data(nb)%var3 => IntDiag(nb)%dq3dt(:,:,13)
       enddo
+
+      idx = idx + 1
+      ExtDiag(idx)%axes = 3
+      ExtDiag(idx)%name = 'upd_mf'
+      ExtDiag(idx)%desc = 'updraft convective mass flux'
+      ExtDiag(idx)%unit = 'kg m-1 s-3'
+      ExtDiag(idx)%mod_name = 'gfs_phys'
+      ExtDiag(idx)%time_avg = .TRUE.
+      allocate (ExtDiag(idx)%data(nblks))
+      do nb = 1,nblks
+        ExtDiag(idx)%data(nb)%var3 => IntDiag(nb)%upd_mf(:,:)
+      enddo
+
+      idx = idx + 1
+      ExtDiag(idx)%axes = 3
+      ExtDiag(idx)%name = 'dwn_mf'
+      ExtDiag(idx)%desc = 'downdraft convective mass flux'
+      ExtDiag(idx)%unit = 'kg m-1 s-3'
+      ExtDiag(idx)%mod_name = 'gfs_phys'
+      ExtDiag(idx)%time_avg = .TRUE.
+      allocate (ExtDiag(idx)%data(nblks))
+      do nb = 1,nblks
+        ExtDiag(idx)%data(nb)%var3 => IntDiag(nb)%dwn_mf(:,:)
+      enddo
+
+      idx = idx + 1
+      ExtDiag(idx)%axes = 3
+      ExtDiag(idx)%name = 'det_mf'
+      ExtDiag(idx)%desc = 'detrainment convective mass flux'
+      ExtDiag(idx)%unit = 'kg m-1 s-3'
+      ExtDiag(idx)%mod_name = 'gfs_phys'
+      ExtDiag(idx)%time_avg = .TRUE.
+      allocate (ExtDiag(idx)%data(nblks))
+      do nb = 1,nblks
+        ExtDiag(idx)%data(nb)%var3 => IntDiag(nb)%det_mf(:,:)
+      enddo
+
+      end if if_qdiag3d
 
     end if if_ldiag3d
 

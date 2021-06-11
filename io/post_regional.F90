@@ -250,8 +250,8 @@ module post_regional
         fldbundle = wrt_int_state%wrtFB(nfb)
 
 ! set grid spec:
-      if(mype==0) print*,'in post_getattr_lam,output_grid=',trim(output_grid),'nfb=',nfb
-      if(mype==0) print*,'in post_getattr_lam, lon1=',lon1,lon2,lat1,lat2,dlon,dlat
+!      if(mype==0) print*,'in post_getattr_lam,output_grid=',trim(output_grid),'nfb=',nfb
+!      if(mype==0) print*,'in post_getattr_lam, lon1=',lon1,lon2,lat1,lat2,dlon,dlat
       gdsdegr = 1000000.
 
       if(trim(output_grid) == 'regional_latlon') then
@@ -274,8 +274,8 @@ module post_regional
         dxval = dlon*gdsdegr
         dyval = dlat*gdsdegr
 
-        if(mype==0) print*,'lonstart,latstart,dyval,dxval', &
-        lonstart,lonlast,latstart,latlast,dyval,dxval
+!        if(mype==0) print*,'lonstart,latstart,dyval,dxval', &
+!        lonstart,lonlast,latstart,latlast,dyval,dxval
 
       else if(trim(output_grid) == 'lambert_conformal') then
         MAPTYPE=1
@@ -347,8 +347,8 @@ module post_regional
           dyval = spval
         endif
 
-        if(mype==0) print*,'rotated latlon,lonstart,latstart,cenlon,cenlat,dyval,dxval', &
-          lonstart_r,lonlast_r,latstart_r,latlast_r,cenlon,cenlat,dyval,dxval
+!        if(mype==0) print*,'rotated latlon,lonstart,latstart,cenlon,cenlat,dyval,dxval', &
+!          lonstart_r,lonlast_r,latstart_r,latlast_r,cenlon,cenlat,dyval,dxval
       endif
 
 ! look at the field bundle attributes
@@ -448,7 +448,7 @@ module post_regional
       use vrbls3d,     only: t, q, uh, vh, wh, alpint, dpres, zint, zmid, o3,  &
                              qqr, qqs, cwm, qqi, qqw, qqg, omga, cfr, pmid,    &
                              q2, rlwtt, rswtt, tcucn, tcucns, train, el_pbl,   &
-                             pint, exch_h, ref_10cm
+                             pint, exch_h, ref_10cm, extcof55, aextc55, u, v
       use vrbls2d,     only: f, pd, sigt4, fis, pblh, ustar, z0, ths, qs, twbs,&
                              qwbs, avgcprate, cprate, avgprec, prec, lspa, sno,&
                              cldefi, th10, q10, tshltr, pshltr, tshltr, albase,&
@@ -477,7 +477,8 @@ module post_regional
                              up_heli_max03,up_heli_min03,rel_vort_max01,       &
                              rel_vort_max, rel_vort_maxhy1, refd_max,          &
                              refdm10c_max, u10max, v10max, wspd10max, sfcuxi,  &
-                             sfcvxi
+                             sfcvxi, t10m, t10avg, psfcavg, akhsavg, akmsavg,  &
+                             albedo, tg
       use soil,        only: sldpth, sh2o, smc, stc
       use masks,       only: lmv, lmh, htm, vtm, gdlat, gdlon, dx, dy, hbm2, sm, sice
       use ctlblk_mod,  only: im, jm, lm, lp1, jsta, jend, jsta_2l, jend_2u, jsta_m,jend_m, &
@@ -557,8 +558,8 @@ module post_regional
       tsrfc   = tprec
       tmaxmin = tprec
       td3d    = tprec
-      if(mype==0)print*,'MP_PHYSICS= ',imp_physics,'nbdl=',nbdl, 'tprec=',tprec,'tclod=',tclod, &
-       'dtp=',dtp,'tmaxmin=',tmaxmin,'jsta=',jsta,jend,im,jm
+!      if(mype==0)print*,'MP_PHYSICS= ',imp_physics,'nbdl=',nbdl, 'tprec=',tprec,'tclod=',tclod, &
+!       'dtp=',dtp,'tmaxmin=',tmaxmin,'jsta=',jsta,jend,im,jm
 
 !
 !$omp parallel do default(shared),private(i,j)
@@ -641,7 +642,7 @@ module post_regional
           lspa(i,j) = SPVAL
           th10(i,j) = SPVAL
           q10(i,j) = SPVAL
-          albase(i,j) = SPVAL
+          albase(i,j) = 0.
         enddo
       enddo
 
@@ -803,7 +804,7 @@ module post_regional
       idat(4)  = wrt_int_state%fdate(4)
       idat(5)  = wrt_int_state%fdate(5)
 !
-      if(mype==0) print *,'idat=',idat,'sdat=',sdat,'ihrst=',ihrst
+!      if(mype==0) print *,'idat=',idat,'sdat=',sdat,'ihrst=',ihrst
 !      CALL W3DIFDAT(JDATE,IDATE,0,RINC)
 !
 !      if(mype==0)print *,' rinc=',rinc
@@ -826,6 +827,34 @@ module post_regional
             qqs(i,j,l) = 0.
             qqi(i,j,l) = 0.
           enddo
+        enddo
+      enddo
+!
+!** temporary fix: initialize t10m, t10avg, psfcavg, akhsavg, akmsavg,
+!** albedo, tg
+!$omp parallel do default(none),private(i,j),shared(jsta_2l,jend_2u,im), &
+!$omp& shared(t10m,t10avg,psfcavg,akhsavg,akmsavg,albedo,tg)
+      do j=jsta_2l,jend_2u
+        do i=1,im
+          t10m(i,j) = 0.
+          t10avg(i,j) = 0.
+          psfcavg(i,j) = 0.
+          akhsavg(i,j) = 0.
+          akmsavg(i,j) = 0.
+          albedo(i,j) = 0.
+          tg(i,j) = 0.
+        enddo
+      enddo
+!$omp parallel do default(none),private(i,j,k),shared(jsta_2l,jend_2u,im,lm), &
+!$omp& shared(extcof55,aextc55,u,v)
+      do k=1,lm
+        do j=jsta_2l,jend_2u
+        do i=1,im
+          extcof55(i,j,k) = 0.
+          aextc55(i,j,k) = 0.
+          u(i,j,k) = 0.
+          v(i,j,k) = 0.
+        enddo
         enddo
       enddo
 !
@@ -925,14 +954,14 @@ module post_regional
        if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
           line=__LINE__, file=__FILE__)) return  ! bail out
 
-       if(mype==0) print *,'in setvar, allocate fcstField,ibdl=',ibdl,'count=',ncount_field,'wrtFBname=',trim(wrtFBName)
+!       if(mype==0) print *,'in setvar, allocate fcstField,ibdl=',ibdl,'count=',ncount_field,'wrtFBname=',trim(wrtFBName)
        allocate(fcstField(ncount_field))
        call ESMF_FieldBundleGet(wrt_int_state%wrtFB(ibdl),           &
          fieldList=fcstField, itemorderflag=ESMF_ITEMORDER_ADDORDER, rc=rc)
        if (ESMF_LogFoundError(rcToCheck=rc, msg=ESMF_LOGERR_PASSTHRU, &
           line=__LINE__, file=__FILE__)) return  ! bail out
 
-       if(mype==0) print *,'in setvar, read field, ibdl=',ibdl, 'nfield=',ncount_field
+!       if(mype==0) print *,'in setvar, read field, ibdl=',ibdl, 'nfield=',ncount_field
        do n=1, ncount_field
 !
           call ESMF_FieldGet(fcstField(n),typekind=typekind, name=fieldname, &
@@ -1299,9 +1328,6 @@ module post_regional
                 do i=ista, iend
                   mxsnal(i,j) = arrayr42d(i,j)
                   if (abs(arrayr42d(i,j)-fillValue) < small) mxsnal(i,j) = spval
-                  if (mxsnal(i,j) /= spval) then
-                    mxsnal(i,j) = mxsnal(i,j) * 0.01
-                  endif
                 enddo
               enddo
             endif
@@ -1372,7 +1398,7 @@ module post_regional
                   else
                     islope(i,j) = 0
                   endif
-                  if (abs(arrayr42d(i,j)-fillValue) < small) islope(i,j) = spval
+                  if (abs(arrayr42d(i,j)-fillValue) < small) islope(i,j) = 0
                 enddo
               enddo
             endif
@@ -1925,7 +1951,7 @@ module post_regional
                 do i=ista, iend
                   if (arrayr42d(i,j) < spval) then
                     ivgtyp(i,j) = nint(arrayr42d(i,j))
-                    if( abs(arrayr42d(i,j)-fillValue) < small)  ivgtyp(i,j) = spval
+                    if( abs(arrayr42d(i,j)-fillValue) < small)  ivgtyp(i,j) = 0
                   else
                     ivgtyp(i,j) = 0
                   endif
@@ -1940,7 +1966,7 @@ module post_regional
                 do i=ista, iend
                   if (arrayr42d(i,j) < spval) then
                     isltyp(i,j) = nint(arrayr42d(i,j))
-                    if( abs(arrayr42d(i,j)-fillValue) < small)  isltyp(i,j) = spval
+                    if( abs(arrayr42d(i,j)-fillValue) < small)  isltyp(i,j) = 0
                   else
                     isltyp(i,j) = 0
                   endif

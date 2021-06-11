@@ -13,7 +13,7 @@ module module_cplfields
   private
 
 ! Export Fields ----------------------------------------
-  integer,          public, parameter :: NexportFields = 72
+  integer,          public, parameter :: NexportFields = 73
   type(ESMF_Field), target, public    :: exportFields(NexportFields)
   character(len=*), public, parameter :: exportFieldsList(NexportFields) = (/ &
        "inst_pres_interface                      ", &
@@ -87,7 +87,8 @@ module module_cplfields
        "inst_pres_height_lowest                  ", &
        "inst_height_lowest                       ", &
        "mean_fprec_rate                          ", &
-       "cpl_scalars"                                &
+       "cpl_scalars                              ", &
+       "openwater_frac_in_atm                    "  &
 !      "northward_wind_neutral                   ", &
 !      "eastward_wind_neutral                    ", &
 !      "upward_wind_neutral                      ", &
@@ -114,7 +115,7 @@ module module_cplfields
        "s","s","s","s","s","s","s","s",     &
        "s","s","s","s","s","s","s","s",     &
        "s","s","s","s","s","s","s","s",     &
-       "s","s","s","s","s","x"              &
+       "s","s","s","s","s","x","s"          &
 !      "l","l","l","l","l","l","l","s",     &
   /)
   ! Set exportFieldShare to .true. if field is provided as memory reference
@@ -134,7 +135,7 @@ module module_cplfields
        .false.,.false.,.false.,.false.,.false., &
        .false.,.false.,.false.,.true. ,.false., &
        .false.,.false.,.false.,.false.,.false., &
-       .false.,.false.                          &
+       .false.,.false.,.false.                  &
 !      .false.,.false.,.false.,.false.,.false., &
 !      .false.,.false.,.false.                  &
   /)
@@ -220,7 +221,7 @@ module module_cplfields
       isCreated = ESMF_FieldIsCreated(exportFields(n), rc=localrc)
       if (ESMF_LogFoundError(rcToCheck=localrc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__, rcToReturn=rc)) return
       if (isCreated) then
-! set data 
+! set data
         call ESMF_FieldGet(exportFields(n), name=fieldname, dimCount=dimCount, typekind=datatype, rc=localrc)
         if (ESMF_LogFoundError(rcToCheck=localrc, msg=ESMF_LOGERR_PASSTHRU, line=__LINE__, file=__FILE__, rcToReturn=rc)) return
         !print *,'in fillExportFields, field created n=',n,size(exportFields),'name=', trim(fieldname)
